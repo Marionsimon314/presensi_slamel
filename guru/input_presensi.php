@@ -42,8 +42,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['simpan_presensi'])) {
     if ($msg === '') { $msg = "Presensi berhasil disimpan " . ($is_draft ? "sebagai Draf." : "secara Final."); }
 }
 
-$kelas_list = $conn->query("SELECT * FROM kelas");
-$mapel_list = $conn->query("SELECT * FROM mapel");
+// Urutkan kelas VII - XII
+$kelas_list = $conn->query("
+    SELECT * FROM kelas 
+    ORDER BY 
+        CASE 
+            WHEN UPPER(nama_kelas) LIKE 'XII%' THEN 6
+            WHEN UPPER(nama_kelas) LIKE 'XI%' THEN 5
+            WHEN UPPER(nama_kelas) LIKE 'X%' THEN 4
+            WHEN UPPER(nama_kelas) LIKE 'IX%' THEN 3
+            WHEN UPPER(nama_kelas) LIKE 'VIII%' THEN 2
+            WHEN UPPER(nama_kelas) LIKE 'VII%' THEN 1
+            ELSE 99
+        END ASC,
+        nama_kelas ASC
+");
+
+$selected_kelas = isset($_GET['kelas_id']) ? intval($_GET['kelas_id']) : 0;
+$selected_mapel = isset($_GET['mapel_id']) ? intval($_GET['mapel_id']) : 0;
+
+// Ambil mata pelajaran khusus milik guru yang sedang login (sesuai kelas jika dipilih)
+if ($selected_kelas > 0) {
+    $stmt_m = $conn->prepare("SELECT * FROM mapel WHERE guru_id = ? AND (kelas_id = ? OR kelas_id IS NULL) ORDER BY nama_mapel ASC");
+    $stmt_m->bind_param("ii", $user_id, $selected_kelas);
+} else {
+    $stmt_m = $conn->prepare("SELECT * FROM mapel WHERE guru_id = ? ORDER BY nama_mapel ASC");
+    $stmt_m->bind_param("i", $user_id);
+}
+$stmt_m->execute();
+$mapel_list = $stmt_m->get_result();
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
@@ -60,30 +87,33 @@ include '../includes/sidebar.php';
             <select name="kelas_id" class="form-control" required>
                 <option value="">-- Pilih Kelas --</option>
                 <?php while ($k = $kelas_list->fetch_assoc()): ?>
-                    <option value="<?= $k['id']; ?>" <?= (isset($_GET['kelas_id']) && $_GET['kelas_id'] == $k['id']) ? 'selected' : ''; ?>><?= htmlspecialchars($k['nama_kelas']); ?></option>
+                    <option value="<?= $k['id']; ?>" <?= ($selected_kelas == $k['id']) ? 'selected' : ''; ?>>
+                        <?= htmlspecialchars($k['nama_kelas']); ?>
+                    </option>
                 <?php endwhile; ?>
             </select>
             <button type="submit" class="btn btn-primary">Tampilkan Siswa</button>
         </div>
     </form>
 
-    <?php if (isset($_GET['kelas_id']) && !empty($_GET['kelas_id'])): 
-        $k_id = intval($_GET['kelas_id']);
-        $siswa_query = $conn->query("SELECT s.id, u.nama_lengkap, s.nis FROM siswa s JOIN users u ON s.user_id = u.id WHERE s.kelas_id = $k_id");
+    <?php if ($selected_kelas > 0): 
+        $siswa_query = $conn->query("SELECT s.id, u.nama_lengkap, s.nis FROM siswa s JOIN users u ON s.user_id = u.id WHERE s.kelas_id = $selected_kelas ORDER BY u.nama_lengkap ASC");
     ?>
     <form method="POST">
-        <input type="hidden" name="kelas_id" value="<?= $k_id; ?>">
+        <input type="hidden" name="kelas_id" value="<?= $selected_kelas; ?>">
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
             <div style="flex:1;">
                 <label>Tanggal</label>
                 <input type="date" name="tanggal" class="form-control" value="<?= date('Y-m-d'); ?>" required>
             </div>
             <div style="flex:1;">
-                <label>Mata Pelajaran</label>
+                <label>Mata Pelajaran Anda</label>
                 <select name="mapel_id" class="form-control" required>
-                    <option value="">-- Pilih Mapel --</option>
+                    <option value="">-- Pilih Mata Pelajaran --</option>
                     <?php while ($m = $mapel_list->fetch_assoc()): ?>
-                        <option value="<?= $m['id']; ?>"><?= htmlspecialchars($m['nama_mapel']); ?></option>
+                        <option value="<?= $m['id']; ?>" <?= ($selected_mapel == $m['id']) ? 'selected' : ''; ?>>
+                            <?= htmlspecialchars($m['kode_mapel']); ?> - <?= htmlspecialchars($m['nama_mapel']); ?> (<?= htmlspecialchars($m['jadwal'] ?? ''); ?>, <?= htmlspecialchars($m['sks'] ?? ''); ?>)
+                        </option>
                     <?php endwhile; ?>
                 </select>
             </div>
@@ -101,26 +131,30 @@ include '../includes/sidebar.php';
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while ($s = $siswa_query->fetch_assoc()): 
-                        $s_id = $s['id'];
-                        $late_cnt = $conn->query("SELECT COUNT(*) as total FROM presensi WHERE siswa_id = $s_id AND status = 'Terlambat' AND is_draft = 0")->fetch_assoc()['total'];
-                    ?>
-                    <tr>
-                        <td><?= htmlspecialchars($s['nis']); ?></td>
-                        <td><?= htmlspecialchars($s['nama_lengkap']); ?></td>
-                        <td><b style="color: #dd6b20;"><?= $late_cnt; ?>x</b> (Konversi Alpa: <?= floor($late_cnt / 3); ?>)</td>
-                        <td>
-                            <select name="status[<?= $s['id']; ?>]" class="form-control" required>
-                                <option value="Hadir">Hadir</option>
-                                <option value="Terlambat">Terlambat</option>
-                                <option value="Izin">Izin</option>
-                                <option value="Sakit">Sakit</option>
-                                <option value="Alpa">Alpa</option>
-                            </select>
-                        </td>
-                        <td><input type="text" name="keterangan[<?= $s['id']; ?>]" class="form-control" placeholder="Alasan / Catatan"></td>
-                    </tr>
-                    <?php endwhile; ?>
+                    <?php if ($siswa_query && $siswa_query->num_rows > 0): ?>
+                        <?php while ($s = $siswa_query->fetch_assoc()): 
+                            $s_id = $s['id'];
+                            $late_cnt = $conn->query("SELECT COUNT(*) as total FROM presensi WHERE siswa_id = $s_id AND status = 'Terlambat' AND is_draft = 0")->fetch_assoc()['total'];
+                        ?>
+                        <tr>
+                            <td><?= htmlspecialchars($s['nis']); ?></td>
+                            <td><?= htmlspecialchars($s['nama_lengkap']); ?></td>
+                            <td><b style="color: #dd6b20;"><?= $late_cnt; ?>x</b> (Konversi Alpa: <?= floor($late_cnt / 3); ?>)</td>
+                            <td>
+                                <select name="status[<?= $s['id']; ?>]" class="form-control" required>
+                                    <option value="Hadir">Hadir</option>
+                                    <option value="Terlambat">Terlambat</option>
+                                    <option value="Izin">Izin</option>
+                                    <option value="Sakit">Sakit</option>
+                                    <option value="Alpa">Alpa</option>
+                                </select>
+                            </td>
+                            <td><input type="text" name="keterangan[<?= $s['id']; ?>]" class="form-control" placeholder="Alasan / Catatan"></td>
+                        </tr>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <tr><td colspan="5" style="text-align: center;">Belum ada siswa terdaftar di kelas ini.</td></tr>
+                    <?php endif; ?>
                 </tbody>
             </table>
         </div>

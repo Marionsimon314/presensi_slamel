@@ -29,8 +29,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password'])) {
 
         if ($user && password_verify($pass_lama, $user['password'])) {
             $hashed_new = password_hash($pass_baru, PASSWORD_DEFAULT);
-            $u_stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
-            $u_stmt->bind_param("si", $hashed_new, $user_id);
+
+            // Perbarui password terenkripsi dan password_plain (jika kolom tersedia)
+            $chk_col = $conn->query("SHOW COLUMNS FROM users LIKE 'password_plain'");
+            if ($chk_col && $chk_col->num_rows > 0) {
+                $u_stmt = $conn->prepare("UPDATE users SET password = ?, password_plain = ? WHERE id = ?");
+                $u_stmt->bind_param("ssi", $hashed_new, $pass_baru, $user_id);
+            } else {
+                $u_stmt = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
+                $u_stmt->bind_param("si", $hashed_new, $user_id);
+            }
 
             if ($u_stmt->execute()) {
                 $msg = "Password Anda berhasil diperbarui!";
@@ -51,6 +59,18 @@ $redirect_dashboard = match($role) {
     'orang_tua' => 'orangtua/dashboard.php',
     default     => 'index.php'
 };
+
+// Deteksi otomatis file gambar di folder assets/img/ atau assets/
+$logo_src = '';
+$daftar_gambar = array_merge(
+    glob(__DIR__ . '/assets/img/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', GLOB_BRACE) ?: [],
+    glob(__DIR__ . '/assets/*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', GLOB_BRACE) ?: []
+);
+
+if (!empty($daftar_gambar)) {
+    $base_dir = str_replace('\\', '/', __DIR__) . '/';
+    $logo_src = str_replace($base_dir, '', str_replace('\\', '/', $daftar_gambar[0]));
+}
 ?>
 <!DOCTYPE html>
 <html lang="id">
@@ -96,7 +116,13 @@ $redirect_dashboard = match($role) {
 <div class="layout-container">
     <aside class="sidebar">
         <div class="brand" style="display: flex; align-items: center; gap: 12px; padding: 15px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
-            <img src="assets/logo.jpg" alt="Logo SLA Mebali" style="width: 38px; height: 38px; object-fit: contain; background: white; padding: 2px; border-radius: 50%;">
+            <?php if (!empty($logo_src)): ?>
+                <img src="<?= htmlspecialchars($logo_src); ?>" alt="Logo SLA Mebali" style="width: 38px; height: 38px; object-fit: cover; background: white; padding: 2px; border-radius: 50%;">
+            <?php else: ?>
+                <div style="width: 38px; height: 38px; border-radius: 50%; background: #ffffff; color: #1b365d; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem; flex-shrink: 0;">
+                    SM
+                </div>
+            <?php endif; ?>
             <span style="font-weight: bold; font-size: 1.1rem; color: #ffffff; letter-spacing: 0.5px;">SLA MEBALI</span>
         </div>
         <nav>

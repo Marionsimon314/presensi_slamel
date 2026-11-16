@@ -81,6 +81,36 @@ $guru_list = $conn->query("SELECT g.id as guru_id, u.id as user_id, u.nama_lengk
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
+
+<style>
+    .password-wrapper {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .password-wrapper input {
+        padding-right: 40px !important;
+    }
+    .toggle-password-btn {
+        position: absolute;
+        right: 12px;
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #475569;
+        transition: color 0.2s;
+    }
+    .toggle-password-btn:hover {
+        color: #1b365d;
+    }
+    .toggle-password-btn svg {
+        width: 19px;
+        height: 19px;
+    }
+</style>
+
 <main class="main-content">
     <div class="topbar">
         <h2>Mengelola Data Guru</h2>
@@ -107,7 +137,15 @@ include '../includes/sidebar.php';
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="password" name="password" class="form-control" required>
+                    <div class="password-wrapper">
+                        <input type="password" name="password" id="tambah_password" class="form-control" required>
+                        <span class="toggle-password-btn" onclick="togglePasswordField('tambah_password', 'eyeIconTambah')" title="Lihat Password">
+                            <svg id="eyeIconTambah" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                        </span>
+                    </div>
                 </div>
             </div>
             <button type="submit" name="tambah_guru" class="btn btn-success" style="margin-top: 15px; padding: 10px 20px; font-weight: 600;">Simpan Data Guru</button>
@@ -192,7 +230,15 @@ include '../includes/sidebar.php';
             </div>
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>Password Baru <small style="color: #7f8c8d;">(Kosongkan jika tidak ingin mengubah password)</small></label>
-                <input type="password" name="password" id="edit_password" class="form-control" placeholder="Password baru...">
+                <div class="password-wrapper">
+                    <input type="password" name="password" id="edit_password" class="form-control" placeholder="Password baru...">
+                    <span class="toggle-password-btn" onclick="togglePasswordField('edit_password', 'eyeIconEdit')" title="Lihat Password">
+                        <svg id="eyeIconEdit" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </span>
+                </div>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
@@ -204,13 +250,34 @@ include '../includes/sidebar.php';
 </div>
 
 <script>
+const eyeOpenSVG = `<path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />`;
+const eyeClosedSVG = `<path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />`;
+
+function togglePasswordField(inputId, iconId) {
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.innerHTML = eyeClosedSVG;
+    } else {
+        input.type = 'password';
+        icon.innerHTML = eyeOpenSVG;
+    }
+}
+
 function bukaModalEditGuru(guruId, userId, nip, nama, username) {
     document.getElementById('edit_guru_id').value = guruId;
     document.getElementById('edit_user_id').value = userId;
     document.getElementById('edit_nip').value = nip;
     document.getElementById('edit_nama_lengkap').value = nama;
     document.getElementById('edit_username').value = username;
-    document.getElementById('edit_password').value = '';
+    
+    // Reset password input & ikon ke mode tersembunyi setiap modal dibuka
+    const editPassInput = document.getElementById('edit_password');
+    editPassInput.value = '';
+    editPassInput.type = 'password';
+    document.getElementById('eyeIconEdit').innerHTML = eyeOpenSVG;
+
     document.getElementById('modalEditGuru').style.display = 'flex';
 }
 

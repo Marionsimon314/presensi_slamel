@@ -194,7 +194,7 @@ if (isset($_POST['login'])) {
 
 <div class="login-card">
     <div class="login-header">
-        <img src="assets/logo.jpg" alt="Logo SLA Mebali" class="login-logo">
+        <img src="assets/img/logo.jpg" alt="Logo SLA Mebali" class="login-logo">
         <h2>SISTEM PRESENSI</h2>
         <span>Sekolah Lanjutan Advent Mebali</span>
     </div>
